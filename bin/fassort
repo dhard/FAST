@@ -17,6 +17,7 @@ use Sort::MergeSort;
 use File::Temp qw/ tempfile /;
 use Storable qw/ store_fd /; 
 use constant { true => 1, false => 0 };
+use Sort::Maker;
 
 use vars qw($VERSION $DESC $NAME $COMMAND $DATE);
 $VERSION = $FAST::VERSION; 
@@ -126,7 +127,7 @@ else {
     $keysort = sub {my $ar = shift; return  rkeysort_inplace { $_->[0] } @$ar; }
   }
   else {
-    $keysort = sub {my $ar = shift; return    keysort_inplace { $_->[0] } @$ar; }
+    $keysort = sub {my $ar = shift; my $sorter = make_sorter(qw( ref_in ref_out), 'ST', string => '$_->[0]'); return  $sorter->( $ar)}#sub {my $ar = shift; return    keysort_inplace { $_->[0] } @$ar; }
   }
 }
 
@@ -164,6 +165,7 @@ unless (@ARGV) {
 }
 
 my $seqs = [];
+my $part_sort = [];
 my $merge;
 my @fnames = ();
 while ($IN or @ARGV) {
@@ -186,10 +188,10 @@ while ($IN or @ARGV) {
       push @$seqs, [$key,$seq];
       if (Devel::Size::total_size($seqs) > $memory_limit) {
 	$merge = 1;                                     ## PREPARE TO MERGE SORT
-	&$keysort(\@$seqs);                             ## SORT DATA IN MEMORY
+	$part_sort = &$keysort(\@$seqs);                             ## SORT DATA IN MEMORY
 	my ($fh, $filename) = File::Temp::tempfile();   ## OPEN TEMPFILE 
 	push @fnames, $filename;                        ## REMEMBER NAME                 
-	Storable::store_fd($seqs, $fh)                  ## STORE DATA
+	Storable::store_fd($part_sort, $fh)            ## STORE DATA
 	    or die("$NAME: Could not write data to $filename with Storable");                 
 	$seqs = [];                                     ## FREE MEMORY
       }
@@ -199,15 +201,15 @@ while ($IN or @ARGV) {
   }
 }
 
-&$keysort(\@$seqs); 
+my $sorted = &$keysort(\@$seqs); 
 
 unless ($merge) {
-  foreach my $seq (@$seqs) {
+  foreach my $seq (@$sorted) {
     print $OUT $seq->[1];
   }
 }
 else {
-  my $last_iter_coderef = sub { return shift @$seqs };
+  my $last_iter_coderef = sub { return shift @$part_sort };
   my $last_iter = Sort::MergeSort::Iterator->new($last_iter_coderef);
   my @iters = ();
   push @iters,$last_iter;
