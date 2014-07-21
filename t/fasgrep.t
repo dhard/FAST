@@ -1,11 +1,12 @@
 use 5.006;
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 11;
+use Test::More tests => 13;
 use Test::Script::Run;
 
 my $test_file = 't/data/fasgrep_test.fas';
 my $test_file2 = 't/data/fasgrep_test2.fas';
+my $test_file3 = 't/data/fasgrep_test3.fas';
 
 open( my $test1, "<", $test_file ) || die "Can't open $test_file"; 
 my @output = <$test1>;
@@ -17,12 +18,18 @@ my @file2 = <$test2>;
 chomp(@file2);
 close($test2);
 
+open( my $test3, "<", $test_file3 ) || die "Can't open $test_file3";
+my @file3 = <$test3>;
+chomp(@file3);
+close($test3);
+
 my @default_test = @output[-30..-1];
 my @sequence_test = @output[-10..-1];
 my @field_test = @output[-30..-1];
 my @negate_test = @output[0..11];
 my @piupac_test = @output[4..21, 32..42];
 my @split_test = @output[-30..-1];
+my @prio_test = @file3[2..3];
 
 run_not_ok('fasgrep', [], 'No input test');
 
@@ -58,3 +65,9 @@ run_output_matches('fasgrep', ['-r', 'AWATCSAT', $test_file2],
 
 run_output_matches('fasgrep', ['-S', 'i', '-f', '2', 'um r', $test_file],
 		   \@split_test, [], 'Checking split options');
+
+run_output_matches('fasgrep', ['-re', 'SWSW', $test_file3],
+		   \@prio_test, [], 'Checking option priority');
+
+run_output_matches('fasgrep', ['-e', 'SWSW', $test_file3],
+		   \@file3, [], 'Checking option priority again');
